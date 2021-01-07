@@ -1,15 +1,68 @@
 from PyQt5 import QtCore, QtGui, QtWidgets
 from functools import partial
-
+from time import sleep
 import calc
 import corr
 import fi_sys
 counter = 0
+class Worker(QtCore.QThread):
+    output = QtCore.pyqtSignal(float, float, float, float, int)
+    def __init__(self, parent=None):
+        QtCore.QThread.__init__(self, parent)
+        self.exiting = False
+        self.paused = True
+
+    def __del__(self):
+        self.exiting = True
+        self.wait()
+
+    def render(self, cords, vertical, amount):
+
+        self.cords = cords
+        self.vertical = vertical
+        self.amount = amount
+        self.start()
+
+    def update(self):
+
+        self.paused = False
+
+    def run(self):
+
+        cords = self.cords
+
+        vertical = self.vertical
+        amount = self.amount
+        while not self.exiting:
+            for i in range(1, (len(cords))):
+
+                while self.paused is True:
+
+                    sleep(0)
+                base_units = calc.get_cords_base_units(cords, i)
+                angel_mils = [-1, 0]
+
+                if 50 < base_units[0] < 1250:
+                    angel_mils = calc.mils_calc(base_units[0], vertical)
+                if amount == 2:
+                    if (i % 2) == 0:
+                        self.output.emit(angel_mils[0], calc.angle_deg_north(base_units[1]),
+                                                      base_units[0], angel_mils[1], int(i))
+                    else:
+                        self.output.emit(angel_mils[0], calc.angle_deg_north(base_units[1]),
+                                                      base_units[0], angel_mils[1], int(i))
+                else:
+                    self.output.emit(angel_mils[0], calc.angle_deg_north(base_units[1]),
+                                                  base_units[0], angel_mils[1], int(i))
+                self.paused = True
+
 
 class UiMainWindow(object):
     def setup_ui(self, main_window):
         main_window.setObjectName("main_window")
         main_window.resize(796, 591)
+        self.thread = Worker()
+
         self.centralwidget = QtWidgets.QWidget(main_window)
         self.centralwidget.setObjectName("centralwidget")
         self.mortar_slider_horizontal = QtWidgets.QSlider(self.centralwidget)
@@ -439,9 +492,19 @@ class UiMainWindow(object):
         self.retranslateUi(main_window)
         QtCore.QMetaObject.connectSlotsByName(main_window)
 
+        #self.thread.output['int', "int", "int", "int", "float"].connect(self.fire_manual)
+        self.thread.output.connect(self.fire_manual)
+
+        self.fire.clicked.connect(self.thread.update)
+
+
         self.mortar_grid_input.textChanged.connect(lambda: self.fire_calculation())
         self.target_grid_input.textChanged.connect(lambda: self.fire_calculation())
         self.target_2_grid_input.textChanged.connect(lambda: self.fire_calculation())
+
+        self.fire_mode_input.currentIndexChanged.connect(lambda: self.fire_calculation())
+        self.auto_input.currentIndexChanged.connect(lambda: self.fire_calculation())
+        self.amount_input.valueChanged.connect(lambda: self.fire_calculation())
 
         self.vertical_seperation_input.valueChanged.connect(lambda: self.fire_calculation())
 
@@ -504,34 +567,51 @@ class UiMainWindow(object):
         self.status_output.setText(_translate("main_window", "Calculating"))
         self.status_label.setText(_translate("main_window", "Status:"))
 
-    def update_main(self, mils, heading, distance, time):
+    def update_main(self, mils, heading, distance, time, shot=1):
         self.mils_output.setText(str(mils))
         self.heading_output.setText(str(round(heading)))
         self.distance_output.setText(str(round(distance)))
-        self.fligth_output.setText(str(round(time, 1)))  # TODO: time is not correct
+        self.fligth_output.setText(str(round(time, 1)))
+        self.roun_output.setText(str(shot))
 
-    def update_second(self, mils, heading, distance):
+    def update_second(self, mils, heading, distance, shot=1):
         self.mils_2_output.setText(str(mils))
         self.heading_2_output.setText(str(round(heading)))
         self.distance_2_output.setText(str(round(distance)))
+        self.roun_output.setText(str(shot))
+
+    def fire_manual(self, mils, heading, distance, time, i):
+        if mils == -1:
+            mils = "Out of Range"
+        if self.amount_input.value() == 1:
+            self.update_main(mils, calc.angle_deg_north(heading), distance, time, i)
+            self.update_second(mils, calc.angle_deg_north(heading), distance, i)
+        else:
+            if i % 2 == 0:
+                self.update_main(mils, calc.angle_deg_north(heading), distance, time, i)
+            else:
+                self.update_second(mils, calc.angle_deg_north(heading), distance, i)
+        return
 
     def auto_fire(self, cords, i):
-        base_units = calc.get_cords_base_units(cords, i)
-        angel_mils = "Out of range"
-        time = 0
+        if self.auto_input.currentText() == "Off":
+            return
+        base_units = calc.get_cords_base_units(cords[0], i)
+        angel_mils = ["Out of range", 0]
+        #time = 0
 
         if 50 < base_units[0] < 1250:
             angel_mils = calc.mils_calc(base_units[0], self.vertical_seperation_input.value())
         if self.amount_input.value() == 2:
             if (i % 2) == 0:
-                self.update_main(angel_mils, calc.angle_deg_north(base_units[1]), base_units[0], time)
+                self.update_main(angel_mils[0], calc.angle_deg_north(base_units[1]), base_units[0], angel_mils[1])
                 return
             else:
-                self.update_second(angel_mils, calc.angle_deg_north(base_units[1]), base_units[0])
+                self.update_second(angel_mils[0], calc.angle_deg_north(base_units[1]), base_units[0])
                 return
         else:
-            self.update_main(angel_mils, calc.angle_deg_north(base_units[0]), base_units[0], time)
-            self.update_second(angel_mils, calc.angle_deg_north(base_units[0]), base_units[0])
+            self.update_main(angel_mils[0], calc.angle_deg_north(base_units[0]), base_units[0], angel_mils[1])
+            self.update_second(angel_mils[0], calc.angle_deg_north(base_units[0]), base_units[0])
         return
 
     def fire_order(self, cords, cords3=None, fire_mode="Normal"):
@@ -547,38 +627,37 @@ class UiMainWindow(object):
             if 50 < base_units[0] < 1250:
                 angel_mils, time = calc.mils_calc(base_units[0], self.vertical_seperation_input.value())
             self.update_main(angel_mils, calc.angle_deg_north(base_units[1]), base_units[0], time)
+
         elif fire_mode == "Line":
             cords.extend(fi_sys.lineFire(cords[1], cords3))
-            self.rounds_output.setText(len(cords) + 1)
+            self.rounds_output.setText(str(len(cords) - 1))
+
             if self.auto_input.currentText() == "On":
                 self.status_output.setText("Firing!")
-                for i in range(len(cords)):
+                for i in range(1, (len(cords))):
                     QtCore.QTimer.singleShot(1000 * i, partial(self.auto_fire, cords, i))
                 self.status_output.setText("Calculating")
             else:
                 self.status_output.setText("Firing!")
-                for i in range(len(cords)):
 
-                    base_units = calc.get_cords_base_units(cords[0], cords[i])
-                    angel_mils = "Out of range"
-                    time = 0
+                self.thread.render(cords, self.vertical_seperation_input.value(), self.amount_input.value())
+        elif fire_mode == "Area":
+            cords.extend(fi_sys.areaFire(cords[1], cords3))
+            self.rounds_output.setText((str(len(cords) - 1)))
 
-                    if 50 < base_units[0] < 1250:
-                        angel_mils = calc.mils_calc(base_units[0], self.vertical_seperation_input.value())
-                    if self.amount_input.value() == 2:
-                        if (i % 2) == 0:
-                            self.update_main(angel_mils, calc.angle_deg_north(base_units[1]), base_units[0], time)
-                            continue
-                        else:
-                            self.update_second(angel_mils, calc.angle_deg_north(base_units[1]), base_units[0])
-                            continue
-                    else:
-                        self.update_main(angel_mils, calc.angle_deg_north(base_units[0]), base_units[0], time)
-                        self.update_second(angel_mils, calc.angle_deg_north(base_units[0]), base_units[0])
+            if self.auto_input.currentText() == "On":
+                self.status_output.setText("Firing!")
+                for i in range(1, (len(cords))):
+                    QtCore.QTimer.singleShot(1000 * i, partial(self.auto_fire, cords, i))
+                self.status_output.setText("Calculating")
+            else:
+                self.status_output.setText("Firing!")
 
-                    # Hier möcht ich warten bis der Knopf self.fire() gedrückt wurde
+                self.thread.render(cords, self.vertical_seperation_input.value(), self.amount_input.value())
+
 
     def fire_calculation(self):
+
         if self.mortar_grid_input.text() != "" and self.target_grid_input.text() != "":
             cords = [self.mortar_grid_input.text(), self.target_grid_input.text()]
 
@@ -592,7 +671,7 @@ class UiMainWindow(object):
                                        self.target_slider_vertical.value())
 
             fire_mode = str(self.fire_mode_input.currentText())
-            if self.target_2_grid_input.text() != "" and self.amount_input.value() == 2 and fire_mode != "Normal":
+            if self.target_2_grid_input.text() != "" and fire_mode != "Normal":
                 cord3 = self.target_2_grid_input.text()
                 try:
                     cord3 = calc.look_up(calc.split_cord(cord3))
@@ -602,6 +681,7 @@ class UiMainWindow(object):
                                         self.mortar_slider_vertical.value())
 
                 if fire_mode == "Line":
+
                     self.fire_order(cords, cord3, fire_mode)
                 elif fire_mode == "Area":
                     self.fire_order(cords, cord3, fire_mode)
@@ -632,6 +712,8 @@ class UiMainWindow(object):
                 QtCore.QRect(381, 195 - int(self.target_2_slider_vertikal.value() * 2.9696), 121, 16))
         self.fire_calculation()
         return
+
+
 
 
 if __name__ == "__main__":
