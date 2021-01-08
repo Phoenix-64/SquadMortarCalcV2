@@ -3,3 +3,11 @@ Input the coordinats in this form: A01-1-1
 
 EXE is packed over the pyinstaller (https://datatofish.com/executable-pyinstaller/):
 pyinstaller --onefile --noconsole main.py
+
+Dependencies:
+PyQt5
+functools
+time
+math
+numpy
+re
