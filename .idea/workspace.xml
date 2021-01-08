@@ -1,8 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="f89b8776-4510-4968-a8aa-a0c509511984" name="Default Changelist" comment="initial Programm">
+    <list default="true" id="f89b8776-4510-4968-a8aa-a0c509511984" name="Default Changelist" comment="-all functions added">
+      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/README" beforeDir="false" afterPath="$PROJECT_DIR$/README" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/main.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -145,7 +147,14 @@
       <option name="project" value="LOCAL" />
       <updated>1609616452648</updated>
     </task>
-    <option name="localTasksCounter" value="3" />
+    <task id="LOCAL-00003" summary="-all functions added">
+      <created>1610054971012</created>
+      <option name="number" value="00003" />
+      <option name="presentableId" value="LOCAL-00003" />
+      <option name="project" value="LOCAL" />
+      <updated>1610054971012</updated>
+    </task>
+    <option name="localTasksCounter" value="4" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
@@ -174,6 +183,7 @@
   </component>
   <component name="VcsManagerConfiguration">
     <MESSAGE value="initial Programm" />
-    <option name="LAST_COMMIT_MESSAGE" value="initial Programm" />
+    <MESSAGE value="-all functions added" />
+    <option name="LAST_COMMIT_MESSAGE" value="-all functions added" />
   </component>
 </project>

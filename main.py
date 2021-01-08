@@ -4,7 +4,7 @@ from time import sleep
 import calc
 import corr
 import fi_sys
-counter = 0
+
 class Worker(QtCore.QThread):
     output = QtCore.pyqtSignal(float, float, float, float, int)
     def __init__(self, parent=None):
@@ -488,6 +488,24 @@ class UiMainWindow(object):
         self.statusbar = QtWidgets.QStatusBar(main_window)
         self.statusbar.setObjectName("statusbar")
         main_window.setStatusBar(self.statusbar)
+        self.shot_time_label = QtWidgets.QLabel(self.centralwidget)
+        self.shot_time_label.setGeometry(QtCore.QRect(570, 240, 121, 16))
+        font = QtGui.QFont()
+        font.setPointSize(10)
+        self.shot_time_label.setFont(font)
+        self.shot_time_label.setObjectName("shot_time_label")
+        self.shot_time_input = QtWidgets.QSpinBox(self.centralwidget)
+        self.shot_time_input.setGeometry(QtCore.QRect(570, 260, 101, 22))
+        font = QtGui.QFont()
+        font.setPointSize(10)
+        self.shot_time_input.setFont(font)
+        self.shot_time_input.setFocusPolicy(QtCore.Qt.NoFocus)
+        self.shot_time_input.setMinimum(1)
+        self.shot_time_input.setMaximum(40)
+        self.shot_time_input.setObjectName("shot_time_input")
+
+
+
 
         self.retranslateUi(main_window)
         QtCore.QMetaObject.connectSlotsByName(main_window)
@@ -496,6 +514,8 @@ class UiMainWindow(object):
         self.thread.output.connect(self.fire_manual)
 
         self.fire.clicked.connect(self.thread.update)
+        self.fire.clicked.connect(lambda: self.fire_calculation(True))
+
 
 
         self.mortar_grid_input.textChanged.connect(lambda: self.fire_calculation())
@@ -505,8 +525,8 @@ class UiMainWindow(object):
         self.fire_mode_input.currentIndexChanged.connect(lambda: self.fire_calculation())
         self.auto_input.currentIndexChanged.connect(lambda: self.fire_calculation())
         self.amount_input.valueChanged.connect(lambda: self.fire_calculation())
-
         self.vertical_seperation_input.valueChanged.connect(lambda: self.fire_calculation())
+        self.shot_time_input.valueChanged.connect(lambda: self.fire_calculation())
 
         self.mortar_slider_horizontal.valueChanged.connect(lambda: self.slider_update(10))
         self.mortar_slider_vertical.valueChanged.connect(lambda: self.slider_update(11))
@@ -514,8 +534,12 @@ class UiMainWindow(object):
         self.target_slider_horizontal.valueChanged.connect(lambda: self.slider_update(20))
         self.target_2_slider_vertikal.valueChanged.connect(lambda: self.slider_update(31))
         self.target_2_slider_horizontal.valueChanged.connect(lambda: self.slider_update(30))
+        #todo: implement slider readonly (https://stackoverflow.com/questions/22844649/pyqt-how-to-set-combobox-read-only)
+        self.readonly = False
 
     def retranslateUi(self, MainWindow):
+        global firePaused
+        firePaused = False
         _translate = QtCore.QCoreApplication.translate
         MainWindow.setWindowTitle(_translate("main_window", "Squad Mortar Calculator"))
         self.mortar_position_label.setText(_translate("main_window", "Mortar Position:"))
@@ -566,6 +590,39 @@ class UiMainWindow(object):
         self.fire.setText(_translate("main_window", "FIRE!"))
         self.status_output.setText(_translate("main_window", "Calculating"))
         self.status_label.setText(_translate("main_window", "Status:"))
+        self.shot_time_label.setText(_translate("main_window", "Time per Shot:"))
+        self.shot_time_input.setValue(4)
+
+
+
+    def block_inputs(self):
+        self.auto_input.setReadOnly(True)
+        self.vertical_seperation_input.setReadOnly(True)
+        self.shot_time_input.setReadOnly(True)
+        self.farther_input.setReadOnly(True)
+        self.left_input.setReadOnly(True)
+        self.mortar_grid_input.setReadOnly(True)
+        self.target_grid_input.setReadOnly(True)
+        self.target_2_grid_input.setReadOnly(True)
+        self.fire.setEnabled(False)
+        self.fire_mode_input.setEnabled(False)
+        self.auto_input.setEnabled(False)
+
+    def allow_inputs(self):
+        self.auto_input.setReadOnly(False)
+        self.vertical_seperation_input.setReadOnly(False)
+        self.shot_time_input.setReadOnly(False)
+        self.farther_input.setReadOnly(False)
+        self.left_input.setReadOnly(False)
+        self.mortar_grid_input.setReadOnly(False)
+        self.target_grid_input.setReadOnly(False)
+        self.target_2_grid_input.setReadOnly(False)
+        self.fire.setEnabled(True)
+        self.fire_mode_input.setEnabled(True)
+        self.auto_input.setEnabled(True)
+
+
+
 
     def update_main(self, mils, heading, distance, time, shot=1):
         self.mils_output.setText(str(mils))
@@ -596,7 +653,7 @@ class UiMainWindow(object):
     def auto_fire(self, cords, i):
         if self.auto_input.currentText() == "Off":
             return
-        base_units = calc.get_cords_base_units(cords[0], i)
+        base_units = calc.get_cords_base_units(cords, i)
         angel_mils = ["Out of range", 0]
         #time = 0
 
@@ -604,20 +661,22 @@ class UiMainWindow(object):
             angel_mils = calc.mils_calc(base_units[0], self.vertical_seperation_input.value())
         if self.amount_input.value() == 2:
             if (i % 2) == 0:
-                self.update_main(angel_mils[0], calc.angle_deg_north(base_units[1]), base_units[0], angel_mils[1])
+                self.update_main(angel_mils[0], calc.angle_deg_north(base_units[1]), base_units[0], angel_mils[1], i)
                 return
             else:
-                self.update_second(angel_mils[0], calc.angle_deg_north(base_units[1]), base_units[0])
+                self.update_second(angel_mils[0], calc.angle_deg_north(base_units[1]), base_units[0], i)
                 return
         else:
-            self.update_main(angel_mils[0], calc.angle_deg_north(base_units[0]), base_units[0], angel_mils[1])
-            self.update_second(angel_mils[0], calc.angle_deg_north(base_units[0]), base_units[0])
+            self.update_main(angel_mils[0], calc.angle_deg_north(base_units[0]), base_units[0], angel_mils[1], i)
+            self.update_second(angel_mils[0], calc.angle_deg_north(base_units[0]), base_units[0], i)
         return
 
-    def fire_order(self, cords, cords3=None, fire_mode="Normal"):
-        angel_mils = "Out of range"
-        time = 0
+    def fire_order(self, cords, cords3=None, fire_mode="Normal", button=False):
 
+
+        angel_mi = "Out of range"
+        time = 0
+        shot_time = self.shot_time_input.value() * 1000
         if fire_mode == "Normal":
 
             base_units = calc.get_cords_base_units(cords)
@@ -632,11 +691,13 @@ class UiMainWindow(object):
             cords.extend(fi_sys.lineFire(cords[1], cords3))
             self.rounds_output.setText(str(len(cords) - 1))
 
-            if self.auto_input.currentText() == "On":
+            if self.auto_input.currentText() == "On" and button is True:
                 self.status_output.setText("Firing!")
+                self.block_inputs()
                 for i in range(1, (len(cords))):
-                    QtCore.QTimer.singleShot(1000 * i, partial(self.auto_fire, cords, i))
+                    QtCore.QTimer.singleShot(shot_time * i, partial(self.auto_fire, cords, i))
                 self.status_output.setText("Calculating")
+                self.allow_inputs()
             else:
                 self.status_output.setText("Firing!")
 
@@ -645,18 +706,20 @@ class UiMainWindow(object):
             cords.extend(fi_sys.areaFire(cords[1], cords3))
             self.rounds_output.setText((str(len(cords) - 1)))
 
-            if self.auto_input.currentText() == "On":
+            if self.auto_input.currentText() == "On" and button is True:
                 self.status_output.setText("Firing!")
+                self.block_inputs()
                 for i in range(1, (len(cords))):
-                    QtCore.QTimer.singleShot(1000 * i, partial(self.auto_fire, cords, i))
+                    QtCore.QTimer.singleShot(shot_time * i, partial(self.auto_fire, cords, i))
                 self.status_output.setText("Calculating")
+                self.allow_inputs()
             else:
                 self.status_output.setText("Firing!")
 
                 self.thread.render(cords, self.vertical_seperation_input.value(), self.amount_input.value())
 
 
-    def fire_calculation(self):
+    def fire_calculation(self, button=False):
 
         if self.mortar_grid_input.text() != "" and self.target_grid_input.text() != "":
             cords = [self.mortar_grid_input.text(), self.target_grid_input.text()]
@@ -682,11 +745,11 @@ class UiMainWindow(object):
 
                 if fire_mode == "Line":
 
-                    self.fire_order(cords, cord3, fire_mode)
+                    self.fire_order(cords, cord3, fire_mode, button)
                 elif fire_mode == "Area":
-                    self.fire_order(cords, cord3, fire_mode)
+                    self.fire_order(cords, cord3, fire_mode, button)
             else:
-                self.fire_order(cords)
+                self.fire_order(cords, button=button)
 
         else:
             return
